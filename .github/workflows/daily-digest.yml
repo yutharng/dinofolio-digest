@@ -1,0 +1,35 @@
+name: Dino Digest Daily
+
+on:
+  schedule:
+    - cron: "0 23 * * *"   # 23:00 UTC = 06:00 น. เวลาไทย (GitHub ใช้ UTC เสมอ)
+  workflow_dispatch: {}     # ปุ่มกดรันเองสำหรับทดสอบ
+
+permissions:
+  contents: write           # ให้ workflow commit ไฟล์กลับเข้า repo ได้
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install beautifulsoup4
+
+      - name: Fetch digest
+        run: python scripts/fetch_digest.py
+
+      - name: Commit & push
+        run: |
+          git config user.name "digest-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add daily/
+          git diff --cached --quiet || git commit -m "digest: $(date -u '+%Y-%m-%d')"
+          git push
