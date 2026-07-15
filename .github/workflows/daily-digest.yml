@@ -2,7 +2,7 @@ name: Dino Digest Daily
 
 on:
   schedule:
-    - cron: "0 23 * * *"   # 23:00 UTC = 06:00 น. เวลาไทย (GitHub ใช้ UTC เสมอ)
+    - cron: "30 23 * * *"   # 23:30 UTC = 06:30 น. เวลาไทย (GitHub ใช้ UTC เสมอ)
   workflow_dispatch: {}     # ปุ่มกดรันเองสำหรับทดสอบ
 
 permissions:
