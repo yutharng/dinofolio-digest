@@ -1,20 +1,21 @@
 name: Dino Digest Daily
 
+# สถาปัตยกรรม trigger (1 งานจริง/วัน):
+#   Primary : cron-job.org ยิง workflow_dispatch ทุกวัน 06:50 น. ไทย (หลัง dinofolio ลงข้อมูล ~06:30-06:35)
+#   Fallback: cron ด้านล่าง 2 รอบ — มีผลเฉพาะเมื่อรอบ primary ไม่เกิด
+#   Guard   : ถ้าไฟล์ของ "วันนี้ (เวลาไทย)" มีแล้ว → ข้ามทุกอย่าง (no-op ~5 วิ) → ไม่มีการรันงานซ้ำ
+
 on:
   schedule:
-    # GitHub มัก drop cron ที่นาทีกลม (:00/:30) ช่วง load สูง → ใช้นาทีเลขคี่
-    # และตั้งหลายรอบกันพลาด (รอบที่ไม่มีไฟล์ใหม่จะไม่ commit อะไร = ไม่มีผลข้างเคียง)
-    - cron: "17 23 * * *"   # 06:17 น. ไทย
-    - cron: "52 23 * * *"   # 06:52 น. ไทย (เก็บตกถ้า dinofolio ลงข้อมูลช้า)
-    - cron: "37 0 * * *"    # 07:37 น. ไทย (เก็บตกรอบสอง)
-    - cron: "7 5 * * *"     # 12:07 น. ไทย (กันเหนียวรอบเที่ยง)
-  workflow_dispatch: {}     # ปุ่มกดรันเองสำหรับทดสอบ
+    - cron: "37 0 * * *"    # 07:37 น. ไทย (fallback รอบ 1)
+    - cron: "7 5 * * *"     # 12:07 น. ไทย (fallback รอบ 2)
+  workflow_dispatch: {}     # ช่องทางหลัก: cron-job.org + ปุ่มกดมือ
 
 permissions:
-  contents: write           # ให้ workflow commit ไฟล์กลับเข้า repo ได้
+  contents: write
 
 concurrency:
-  group: dino-digest        # กันหลายรอบรันชนกันเอง
+  group: dino-digest
   cancel-in-progress: false
 
 jobs:
@@ -24,18 +25,33 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Guard — skip if today's file already exists
+        id: guard
+        run: |
+          TODAY=$(TZ=Asia/Bangkok date +%F)
+          if [ -f "daily/dino-digest-${TODAY}.md" ]; then
+            echo "ไฟล์ของวันนี้ (${TODAY}) มีแล้ว — ข้ามการทำงานทั้งหมด"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Python
+        if: steps.guard.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install deps
+        if: steps.guard.outputs.skip == 'false'
         run: pip install beautifulsoup4
 
       - name: Fetch digest
+        if: steps.guard.outputs.skip == 'false'
         run: python scripts/fetch_digest.py
 
       - name: Commit & push
+        if: steps.guard.outputs.skip == 'false'
         run: |
           git config user.name "digest-bot"
           git config user.email "actions@users.noreply.github.com"
